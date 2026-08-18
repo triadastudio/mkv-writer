@@ -19,7 +19,7 @@ intentionally outside this library's scope.
 ## Usage
 
 ```cpp
-#include <mkv_writer/MkvWriter.h>
+#include <MkvWriter.h>
 
 #include <fstream>
 

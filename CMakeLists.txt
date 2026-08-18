@@ -13,13 +13,14 @@ endif()
 
 add_library(mkv-writer STATIC
     src/MkvWriter.cpp
+    src/MkvWriter.h
 )
 add_library(mkv-writer::mkv-writer ALIAS mkv-writer)
 
 target_compile_features(mkv-writer PUBLIC cxx_std_17)
 target_include_directories(mkv-writer
     PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 set_target_properties(mkv-writer PROPERTIES
@@ -48,7 +49,7 @@ install(TARGETS mkv-writer
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
-install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(FILES src/MkvWriter.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
 configure_package_config_file(
     cmake/mkv-writer-config.cmake.in
