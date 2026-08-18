@@ -36,19 +36,19 @@ jobs:
       - name: Validate publishing configuration
         if: github.repository == 'triadastudio/mkv-writer' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
         env:
-          CONAN_REMOTE_URL: ${{ vars.CONAN_REMOTE_URL }}
-          CONAN_LOGIN_USERNAME_TRIADA: ${{ secrets.CONAN_LOGIN_USERNAME_TRIADA }}
-          CONAN_PASSWORD_TRIADA: ${{ secrets.CONAN_PASSWORD_TRIADA }}
+          ARTIFACTORY_URL: ${{ secrets.ARTIFACTORY_URL }}
+          ARTIFACTORY_USER: ${{ secrets.ARTIFACTORY_USER }}
+          ARTIFACTORY_APIKEY: ${{ secrets.ARTIFACTORY_APIKEY }}
         run: >-
-          python -c "import os, sys; names = ('CONAN_REMOTE_URL', 'CONAN_LOGIN_USERNAME_TRIADA', 'CONAN_PASSWORD_TRIADA'); missing = [name for name in names if not os.environ.get(name)]; print('Missing GitHub configuration: ' + ', '.join(missing)) if missing else None; sys.exit(bool(missing))"
+          python -c "import os, sys; names = ('ARTIFACTORY_URL', 'ARTIFACTORY_USER', 'ARTIFACTORY_APIKEY'); missing = [name for name in names if not os.environ.get(name)]; print('Missing GitHub configuration: ' + ', '.join(missing)) if missing else None; sys.exit(bool(missing))"
       - name: Configure remote
         if: github.repository == 'triadastudio/mkv-writer' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-        run: conan remote add triada "${{ vars.CONAN_REMOTE_URL }}" --force
+        run: conan remote add triada "${{ secrets.ARTIFACTORY_URL }}" --force
       - name: Authenticate
         if: github.repository == 'triadastudio/mkv-writer' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
         env:
-          CONAN_LOGIN_USERNAME_TRIADA: ${{ secrets.CONAN_LOGIN_USERNAME_TRIADA }}
-          CONAN_PASSWORD_TRIADA: ${{ secrets.CONAN_PASSWORD_TRIADA }}
+          CONAN_LOGIN_USERNAME_TRIADA: ${{ secrets.ARTIFACTORY_USER }}
+          CONAN_PASSWORD_TRIADA: ${{ secrets.ARTIFACTORY_APIKEY }}
         run: conan remote auth triada --force
       - name: Upload package
         if: github.repository == 'triadastudio/mkv-writer' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
