@@ -1,0 +1,4 @@
+@PACKAGE_INIT@
+
+include("${CMAKE_CURRENT_LIST_DIR}/mkv-writer-targets.cmake")
+check_required_components(mkv-writer)
