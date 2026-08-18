@@ -1,6 +1,7 @@
 name: Publish Conan package
 
 on:
+  push:
   workflow_dispatch:
 
 permissions:
@@ -8,7 +9,7 @@ permissions:
 
 jobs:
   publish:
-    if: github.repository == 'triadastudio/mkv-writer' && github.ref == 'refs/heads/master'
+    if: github.repository == 'triadastudio/mkv-writer'
     strategy:
       fail-fast: false
       matrix:
