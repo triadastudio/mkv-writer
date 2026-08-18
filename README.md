@@ -63,6 +63,19 @@ find_package(mkv-writer CONFIG REQUIRED)
 target_link_libraries(my-recorder PRIVATE mkv-writer::mkv-writer)
 ```
 
+## Conan
+
+The repository includes a Conan 2 recipe for the static library. Create the
+package and run its consumer test with:
+
+```console
+conan profile detect --force
+conan create . -s build_type=Release -s compiler.cppstd=17 --build=missing
+```
+
+Consume `mkv-writer/0.1.0` through `CMakeDeps` and link the same
+`mkv-writer::mkv-writer` target shown above.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).
