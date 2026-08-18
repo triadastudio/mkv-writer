@@ -39,7 +39,8 @@ jobs:
           CONAN_REMOTE_URL: ${{ vars.CONAN_REMOTE_URL }}
           CONAN_LOGIN_USERNAME_TRIADA: ${{ secrets.CONAN_LOGIN_USERNAME_TRIADA }}
           CONAN_PASSWORD_TRIADA: ${{ secrets.CONAN_PASSWORD_TRIADA }}
-        run: python -c "import os, sys; names = ('CONAN_REMOTE_URL', 'CONAN_LOGIN_USERNAME_TRIADA', 'CONAN_PASSWORD_TRIADA'); missing = [name for name in names if not os.environ.get(name)]; print('Missing GitHub configuration: ' + ', '.join(missing)) if missing else None; sys.exit(bool(missing))"
+        run: >-
+          python -c "import os, sys; names = ('CONAN_REMOTE_URL', 'CONAN_LOGIN_USERNAME_TRIADA', 'CONAN_PASSWORD_TRIADA'); missing = [name for name in names if not os.environ.get(name)]; print('Missing GitHub configuration: ' + ', '.join(missing)) if missing else None; sys.exit(bool(missing))"
       - name: Configure remote
         if: github.repository == 'triadastudio/mkv-writer' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
         run: conan remote add triada "${{ vars.CONAN_REMOTE_URL }}" --force
