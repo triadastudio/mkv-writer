@@ -33,3 +33,22 @@ jobs:
         run: conan profile detect --force
       - name: Create package
         run: conan create . -s build_type=${{ matrix.build_type }} -s compiler.cppstd=17 --build=missing
+      - name: Validate publishing configuration
+        if: github.repository == 'triadastudio/mkv-writer' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          CONAN_REMOTE_URL: ${{ vars.CONAN_REMOTE_URL }}
+          CONAN_LOGIN_USERNAME_TRIADA: ${{ secrets.CONAN_LOGIN_USERNAME_TRIADA }}
+          CONAN_PASSWORD_TRIADA: ${{ secrets.CONAN_PASSWORD_TRIADA }}
+        run: python -c "import os, sys; names = ('CONAN_REMOTE_URL', 'CONAN_LOGIN_USERNAME_TRIADA', 'CONAN_PASSWORD_TRIADA'); missing = [name for name in names if not os.environ.get(name)]; print('Missing GitHub configuration: ' + ', '.join(missing)) if missing else None; sys.exit(bool(missing))"
+      - name: Configure remote
+        if: github.repository == 'triadastudio/mkv-writer' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        run: conan remote add triada "${{ vars.CONAN_REMOTE_URL }}" --force
+      - name: Authenticate
+        if: github.repository == 'triadastudio/mkv-writer' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          CONAN_LOGIN_USERNAME_TRIADA: ${{ secrets.CONAN_LOGIN_USERNAME_TRIADA }}
+          CONAN_PASSWORD_TRIADA: ${{ secrets.CONAN_PASSWORD_TRIADA }}
+        run: conan remote auth triada --force
+      - name: Upload package
+        if: github.repository == 'triadastudio/mkv-writer' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        run: conan upload "mkv-writer/*" --remote=triada --check --confirm
