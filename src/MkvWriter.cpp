@@ -170,10 +170,18 @@ std::string_view MkvWriter::LastError() const noexcept
     return lastError;
 }
 
-bool MkvWriter::Fail( std::string message )
+bool MkvWriter::Reject( std::string message )
 {
     if( lastError.empty() )
         lastError = std::move( message );
+    return false;
+}
+
+bool MkvWriter::Fail( std::string message )
+{
+    if( !hasFatalError )
+        lastError = std::move( message );
+    hasFatalError = true;
     return false;
 }
 
@@ -197,15 +205,18 @@ bool MkvWriter::Open( std::ofstream&& outStream,
                       const std::string_view newCodecId )
 {
     if( file.is_open() )
-        return Fail( "Open: writer is already open" );
+        return Reject( "Open: writer is already open" );
+
+    lastError.clear();
+    hasFatalError = false;
     if( !outStream.is_open() )
-        return Fail( "Open: output stream is not open" );
+        return Reject( "Open: output stream is not open" );
     if( newWidth == 0 || newHeight == 0 )
-        return Fail( "Open: dimensions must be non-zero" );
+        return Reject( "Open: dimensions must be non-zero" );
     if( !std::isfinite( newFps ) || newFps <= 0.0f )
-        return Fail( "Open: fps must be finite and positive" );
+        return Reject( "Open: fps must be finite and positive" );
     if( newCodecId.empty() )
-        return Fail( "Open: codec ID must not be empty" );
+        return Reject( "Open: codec ID must not be empty" );
 
     width = newWidth;
     height = newHeight;
@@ -219,7 +230,6 @@ bool MkvWriter::Open( std::ofstream&& outStream,
     clusterStartMs = 0;
     clusterOpen = false;
     cuePoints.clear();
-    lastError.clear();
     file = std::move( outStream );
     file.exceptions( std::ios::goodbit );
 
@@ -241,11 +251,11 @@ bool MkvWriter::SetCodecPrivate( const std::uint8_t* const data,
                                  const std::size_t size )
 {
     if( !file.is_open() )
-        return Fail( "SetCodecPrivate: writer is not open" );
+        return Reject( "SetCodecPrivate: writer is not open" );
     if( headersWritten )
-        return Fail( "SetCodecPrivate: headers are already written" );
+        return Reject( "SetCodecPrivate: headers are already written" );
     if( data == nullptr && size != 0 )
-        return Fail( "SetCodecPrivate: data is null but size is non-zero" );
+        return Reject( "SetCodecPrivate: data is null but size is non-zero" );
 
     codecPrivate.clear();
     if( size != 0 )
@@ -365,13 +375,13 @@ bool MkvWriter::WriteFrame( const void* const data,
                             const bool keyframe )
 {
     if( !file.is_open() )
-        return Fail( "WriteFrame: writer is not open" );
+        return Reject( "WriteFrame: writer is not open" );
     if( data == nullptr || size == 0 )
-        return Fail( "WriteFrame: packet must not be empty" );
+        return Reject( "WriteFrame: packet must not be empty" );
     if( size > kMaxKnownSize8 - 4 )
-        return Fail( "WriteFrame: packet exceeds the EBML element size limit" );
+        return Reject( "WriteFrame: packet exceeds the EBML element size limit" );
     if( frameCount != 0 && timestampMs < lastTimestampMs )
-        return Fail( "WriteFrame: timestamps must be monotonic" );
+        return Reject( "WriteFrame: timestamps must be monotonic" );
     if( !headersWritten && !WriteHeaders() )
         return false;
 
@@ -414,7 +424,7 @@ bool MkvWriter::WriteFrame( const void* const data,
 
     const std::uint64_t relative = timestampMs - clusterStartMs;
     if( relative > static_cast< std::uint64_t >( std::numeric_limits< std::int16_t >::max() ) )
-        return Fail( "WriteFrame: relative cluster timestamp exceeds int16 range" );
+        return Reject( "WriteFrame: relative cluster timestamp exceeds int16 range" );
 
     blockHeader.clear();
     AppendId( blockHeader, kIdSimpleBlock );
@@ -435,9 +445,9 @@ bool MkvWriter::WriteFrame( const void* const data,
 bool MkvWriter::Finalize()
 {
     if( !file.is_open() )
-        return lastError.empty();
+        return !hasFatalError;
 
-    const bool hadPriorError = !lastError.empty();
+    const bool hadPriorFatalError = hasFatalError;
     bool success = true;
     if( !headersWritten )
         success = WriteHeaders();
@@ -527,9 +537,7 @@ bool MkvWriter::Finalize()
 
     if( success )
     {
-        const double durationMs = frameCount == 0
-            ? 0.0
-            : static_cast< double >( lastTimestampMs ) + 1000.0 / fps;
+        const double durationMs = frameCount == 0 ? 0.0 : static_cast< double >( lastTimestampMs ) + 1000.0 / fps;
         std::uint64_t bits = 0;
         std::memcpy( &bits, &durationMs, sizeof( bits ) );
         std::uint8_t durationBytes[ 8 ]{};
@@ -553,7 +561,7 @@ bool MkvWriter::Finalize()
     file.close();
     if( file.fail() && success )
         success = Fail( "Finalize: output stream close failed" );
-    return success && !hadPriorError;
+    return success && !hadPriorFatalError;
 }
 
 }  // namespace mkv_writer

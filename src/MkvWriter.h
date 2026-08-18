@@ -41,12 +41,16 @@ public:
                      const std::uint64_t timestampMs,
                      const bool keyframe );
 
-    // Patches sizes, duration and cue metadata, then closes the file.
-    // It is safe to call more than once.
+    // Patches sizes, duration and cue metadata, then closes the file. Returns
+    // false after a fatal stream or structural error, but not after a rejected
+    // call that left the output intact. It is safe to call more than once.
     bool Finalize();
 
     [[nodiscard]] bool IsOpen() const noexcept;
     [[nodiscard]] std::uint64_t GetWrittenFrameCount() const noexcept;
+
+    // Inspect after an operation returns false. The view can be invalidated by
+    // a later non-const operation.
     [[nodiscard]] std::string_view LastError() const noexcept;
 
 private:
@@ -56,6 +60,7 @@ private:
     bool WriteBytes( const void* const data,
                      const std::size_t size,
                      const std::string_view operation );
+    bool Reject( std::string message );
     bool Fail( std::string message );
 
     std::ofstream file;
@@ -85,6 +90,7 @@ private:
     std::streampos clusterSizeOffset{};
 
     std::string lastError;
+    bool hasFatalError = false;
 };
 
 }  // namespace mkv_writer

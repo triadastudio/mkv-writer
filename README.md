@@ -31,9 +31,11 @@ writer.WriteFrame(packet.data(), packet.size(), timestamp_ms, is_keyframe);
 writer.Finalize();
 ```
 
-Every mutating operation returns `bool`; `LastError()` reports the first failure.
-Call `Finalize()` explicitly to observe finalization failures. The writer also
-finalizes an open file from its destructor as a safety net.
+Every mutating operation returns `bool`; inspect `LastError()` after a failure.
+Rejected arguments or call ordering do not poison otherwise valid output, while
+stream and structural errors do. Call `Finalize()` explicitly to observe fatal
+or finalization failures. The writer also finalizes an open file from its
+destructor as a safety net.
 
 ## Build and test
 

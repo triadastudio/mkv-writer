@@ -1,5 +1,4 @@
 #include <MkvWriter.h>
-
 #include <array>
 #include <cstdint>
 #include <filesystem>
