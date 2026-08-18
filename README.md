@@ -1,6 +1,6 @@
 # mkv-writer
 
-Small, dependency-free Matroska writer for a single hardware-encoded video track.
+Small, dependency-free Matroska writer for a single encoded video track.
 It streams encoded packets directly to a seekable file and back-patches cluster and
 segment sizes during finalization, avoiding whole-GOP buffering.
 
