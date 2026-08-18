@@ -10,7 +10,7 @@
 
 namespace mkv_writer {
 
-// Minimal Matroska muxer for one hardware-encoded video track. Headers are
+// Minimal Matroska muxer for one encoded video track. Headers are
 // written lazily so codec-private bytes discovered in the first packet can be
 // supplied before the first WriteFrame call.
 class MkvWriter final
