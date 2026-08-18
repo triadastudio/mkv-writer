@@ -1,7 +1,5 @@
 #pragma once
 
-#include "mkv_writer/Export.h"
-
 #include <cstddef>
 #include <cstdint>
 #include <fstream>
@@ -18,8 +16,8 @@ namespace mkv_writer {
 class MkvWriter final
 {
 public:
-    MKV_WRITER_API MkvWriter();
-    MKV_WRITER_API ~MkvWriter() noexcept;
+    MkvWriter();
+    ~MkvWriter() noexcept;
 
     MkvWriter( const MkvWriter& ) = delete;
     MkvWriter& operator=( const MkvWriter& ) = delete;
@@ -28,28 +26,28 @@ public:
 
     // Takes ownership of an open binary, seekable output stream. Append mode
     // is unsupported because finalization back-patches earlier metadata.
-    MKV_WRITER_API bool Open( std::ofstream&& outStream,
-                              const std::uint32_t width,
-                              const std::uint32_t height,
-                              const float fps,
-                              const std::string_view codecId );
+    bool Open( std::ofstream&& outStream,
+               const std::uint32_t width,
+               const std::uint32_t height,
+               const float fps,
+               const std::string_view codecId );
 
     // Must be called after Open and before the first WriteFrame.
-    MKV_WRITER_API bool SetCodecPrivate( const std::uint8_t* const data,
-                                         const std::size_t size );
+    bool SetCodecPrivate( const std::uint8_t* const data,
+                          const std::size_t size );
 
-    MKV_WRITER_API bool WriteFrame( const void* const data,
-                                    const std::size_t size,
-                                    const std::uint64_t timestampMs,
-                                    const bool keyframe );
+    bool WriteFrame( const void* const data,
+                     const std::size_t size,
+                     const std::uint64_t timestampMs,
+                     const bool keyframe );
 
     // Patches sizes, duration and cue metadata, then closes the file.
     // It is safe to call more than once.
-    MKV_WRITER_API bool Finalize();
+    bool Finalize();
 
-    [[nodiscard]] MKV_WRITER_API bool IsOpen() const noexcept;
-    [[nodiscard]] MKV_WRITER_API std::uint64_t GetWrittenFrameCount() const noexcept;
-    [[nodiscard]] MKV_WRITER_API std::string_view LastError() const noexcept;
+    [[nodiscard]] bool IsOpen() const noexcept;
+    [[nodiscard]] std::uint64_t GetWrittenFrameCount() const noexcept;
+    [[nodiscard]] std::string_view LastError() const noexcept;
 
 private:
     bool WriteHeaders();

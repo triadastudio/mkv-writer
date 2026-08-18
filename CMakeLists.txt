@@ -11,7 +11,7 @@ else()
     option(MKV_WRITER_BUILD_TESTS "Build mkv-writer tests" OFF)
 endif()
 
-add_library(mkv-writer
+add_library(mkv-writer STATIC
     src/MkvWriter.cpp
 )
 add_library(mkv-writer::mkv-writer ALIAS mkv-writer)
@@ -22,18 +22,9 @@ target_include_directories(mkv-writer
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
-target_compile_definitions(mkv-writer
-    PRIVATE MKV_WRITER_BUILDING_LIBRARY
-)
-if(BUILD_SHARED_LIBS)
-    target_compile_definitions(mkv-writer PUBLIC MKV_WRITER_SHARED)
-endif()
-
 set_target_properties(mkv-writer PROPERTIES
     CXX_EXTENSIONS OFF
     DEBUG_POSTFIX d
-    VERSION ${PROJECT_VERSION}
-    SOVERSION ${PROJECT_VERSION_MAJOR}
 )
 
 if(MSVC)

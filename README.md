@@ -11,7 +11,7 @@ The initial API supports:
 - `SimpleBlock` output with millisecond timestamps;
 - keyframe cues and a `SeekHead`;
 - bounded five-second clusters;
-- static or shared builds on C++17 toolchains.
+- static builds on C++17 toolchains.
 
 Audio, subtitles, lacing, chapters, tags, attachments, and non-seekable outputs are
 intentionally outside this library's scope.

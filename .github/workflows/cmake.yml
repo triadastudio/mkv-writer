@@ -13,7 +13,6 @@ jobs:
       fail-fast: false
       matrix:
         os: [windows-2022, ubuntu-24.04, macos-14]
-        shared: ["OFF", "ON"]
         include:
           - os: windows-2022
             configure_args: -G Ninja -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_LINKER=lld-link
@@ -23,22 +22,18 @@ jobs:
             configure_args: ""
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Configure
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=${{ matrix.shared }} -DMKV_WRITER_BUILD_TESTS=ON ${{ matrix.configure_args }}
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DMKV_WRITER_BUILD_TESTS=ON ${{ matrix.configure_args }}
       - name: Build
         run: cmake --build build --config Release
       - name: Test
         run: ctest --test-dir build -C Release --output-on-failure
       - name: Install
-        if: matrix.shared == 'OFF'
         run: cmake --install build --config Release --prefix "${{ github.workspace }}/install"
       - name: Configure installed-package consumer
-        if: matrix.shared == 'OFF'
         run: cmake -S tests/consumer -B build-consumer -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="${{ github.workspace }}/install" ${{ matrix.configure_args }}
       - name: Build installed-package consumer
-        if: matrix.shared == 'OFF'
         run: cmake --build build-consumer --config Release
       - name: Test installed-package consumer
-        if: matrix.shared == 'OFF'
         run: ctest --test-dir build-consumer -C Release --output-on-failure
