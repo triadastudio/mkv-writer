@@ -1,0 +1,39 @@
+name: CMake
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, ubuntu-24.04, macos-14]
+        include:
+          - os: windows-2022
+            configure_args: -G Ninja -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_LINKER=lld-link
+          - os: ubuntu-24.04
+            configure_args: ""
+          - os: macos-14
+            configure_args: ""
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DMKV_WRITER_BUILD_TESTS=ON ${{ matrix.configure_args }}
+      - name: Build
+        run: cmake --build build --config Release
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure
+      - name: Install
+        run: cmake --install build --config Release --prefix "${{ github.workspace }}/install"
+      - name: Configure installed-package consumer
+        run: cmake -S tests/consumer -B build-consumer -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="${{ github.workspace }}/install" ${{ matrix.configure_args }}
+      - name: Build installed-package consumer
+        run: cmake --build build-consumer --config Release
+      - name: Test installed-package consumer
+        run: ctest --test-dir build-consumer -C Release --output-on-failure
