@@ -1,7 +1,9 @@
+import os
+
 from conan import ConanFile
 from conan.tools.build import check_min_cppstd
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
-from conan.tools.files import collect_libs
+from conan.tools.files import collect_libs, copy
 
 
 class MkvWriterConan(ConanFile):
@@ -19,7 +21,6 @@ class MkvWriterConan(ConanFile):
     settings = "os", "arch", "compiler", "build_type"
     options = {"fPIC": [True, False]}
     default_options = {"fPIC": True}
-    exports_sources = "CMakeLists.txt", "LICENSE", "cmake/*", "src/*"
 
     def config_options(self):
         if self.settings.os == "Windows":
@@ -29,7 +30,13 @@ class MkvWriterConan(ConanFile):
         check_min_cppstd(self, "17")
 
     def layout(self):
+        self.folders.root = ".."
         cmake_layout(self)
+
+    def export_sources(self):
+        project_root = os.path.join(self.recipe_folder, "..")
+        for pattern in ("CMakeLists.txt", "LICENSE", "cmake/*", "src/*"):
+            copy(self, pattern, project_root, self.export_sources_folder)
 
     def generate(self):
         toolchain = CMakeToolchain(self)

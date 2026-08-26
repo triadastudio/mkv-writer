@@ -25,7 +25,7 @@ jobs:
       - name: Detect profile
         run: conan profile detect --force
       - name: Create package
-        run: conan create . -s build_type=${{ matrix.build_type }} -s compiler.cppstd=17 --build=missing
+        run: conan create conan -s build_type=${{ matrix.build_type }} -s compiler.cppstd=17 --build=missing
       - name: Validate publishing configuration
         if: github.repository == 'triadastudio/mkv-writer' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
         env:

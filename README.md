@@ -70,7 +70,7 @@ package and run its consumer test with:
 
 ```console
 conan profile detect --force
-conan create . -s build_type=Release -s compiler.cppstd=17 --build=missing
+conan create conan -s build_type=Release -s compiler.cppstd=17 --build=missing
 ```
 
 Consume `mkv-writer/0.1.0` through `CMakeDeps` and link the same
