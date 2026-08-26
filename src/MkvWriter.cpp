@@ -10,51 +10,51 @@ namespace {
 
 using ByteBuffer = std::vector< std::uint8_t >;
 
-constexpr std::uint32_t kIdEbml = 0x1A45DFA3u;
-constexpr std::uint32_t kIdEbmlVersion = 0x4286u;
-constexpr std::uint32_t kIdEbmlReadVersion = 0x42F7u;
-constexpr std::uint32_t kIdEbmlMaxIdLength = 0x42F2u;
-constexpr std::uint32_t kIdEbmlMaxSizeLength = 0x42F3u;
-constexpr std::uint32_t kIdDocType = 0x4282u;
-constexpr std::uint32_t kIdDocTypeVersion = 0x4287u;
-constexpr std::uint32_t kIdDocTypeReadVersion = 0x4285u;
-constexpr std::uint32_t kIdSegment = 0x18538067u;
-constexpr std::uint32_t kIdInfo = 0x1549A966u;
-constexpr std::uint32_t kIdTimestampScale = 0x2AD7B1u;
-constexpr std::uint32_t kIdMuxingApp = 0x4D80u;
-constexpr std::uint32_t kIdWritingApp = 0x5741u;
-constexpr std::uint32_t kIdDuration = 0x4489u;
-constexpr std::uint32_t kIdTracks = 0x1654AE6Bu;
-constexpr std::uint32_t kIdTrackEntry = 0xAEu;
-constexpr std::uint32_t kIdTrackNumber = 0xD7u;
-constexpr std::uint32_t kIdTrackUid = 0x73C5u;
-constexpr std::uint32_t kIdTrackType = 0x83u;
-constexpr std::uint32_t kIdFlagLacing = 0x9Cu;
-constexpr std::uint32_t kIdCodecId = 0x86u;
-constexpr std::uint32_t kIdCodecPrivate = 0x63A2u;
-constexpr std::uint32_t kIdDefaultDuration = 0x23E383u;
-constexpr std::uint32_t kIdVideo = 0xE0u;
-constexpr std::uint32_t kIdPixelWidth = 0xB0u;
-constexpr std::uint32_t kIdPixelHeight = 0xBAu;
-constexpr std::uint32_t kIdCluster = 0x1F43B675u;
-constexpr std::uint32_t kIdClusterTimestamp = 0xE7u;
-constexpr std::uint32_t kIdSimpleBlock = 0xA3u;
-constexpr std::uint32_t kIdSeekHead = 0x114D9B74u;
-constexpr std::uint32_t kIdSeek = 0x4DBBu;
-constexpr std::uint32_t kIdSeekId = 0x53ABu;
-constexpr std::uint32_t kIdSeekPosition = 0x53ACu;
-constexpr std::uint32_t kIdVoid = 0xECu;
-constexpr std::uint32_t kIdCues = 0x1C53BB6Bu;
-constexpr std::uint32_t kIdCuePoint = 0xBBu;
-constexpr std::uint32_t kIdCueTime = 0xB3u;
-constexpr std::uint32_t kIdCueTrackPositions = 0xB7u;
-constexpr std::uint32_t kIdCueTrack = 0xF7u;
-constexpr std::uint32_t kIdCueClusterPosition = 0xF1u;
+constexpr std::uint32_t IdEbml = 0x1A45DFA3u;
+constexpr std::uint32_t IdEbmlVersion = 0x4286u;
+constexpr std::uint32_t IdEbmlReadVersion = 0x42F7u;
+constexpr std::uint32_t IdEbmlMaxIdLength = 0x42F2u;
+constexpr std::uint32_t IdEbmlMaxSizeLength = 0x42F3u;
+constexpr std::uint32_t IdDocType = 0x4282u;
+constexpr std::uint32_t IdDocTypeVersion = 0x4287u;
+constexpr std::uint32_t IdDocTypeReadVersion = 0x4285u;
+constexpr std::uint32_t IdSegment = 0x18538067u;
+constexpr std::uint32_t IdInfo = 0x1549A966u;
+constexpr std::uint32_t IdTimestampScale = 0x2AD7B1u;
+constexpr std::uint32_t IdMuxingApp = 0x4D80u;
+constexpr std::uint32_t IdWritingApp = 0x5741u;
+constexpr std::uint32_t IdDuration = 0x4489u;
+constexpr std::uint32_t IdTracks = 0x1654AE6Bu;
+constexpr std::uint32_t IdTrackEntry = 0xAEu;
+constexpr std::uint32_t IdTrackNumber = 0xD7u;
+constexpr std::uint32_t IdTrackUid = 0x73C5u;
+constexpr std::uint32_t IdTrackType = 0x83u;
+constexpr std::uint32_t IdFlagLacing = 0x9Cu;
+constexpr std::uint32_t IdCodecId = 0x86u;
+constexpr std::uint32_t IdCodecPrivate = 0x63A2u;
+constexpr std::uint32_t IdDefaultDuration = 0x23E383u;
+constexpr std::uint32_t IdVideo = 0xE0u;
+constexpr std::uint32_t IdPixelWidth = 0xB0u;
+constexpr std::uint32_t IdPixelHeight = 0xBAu;
+constexpr std::uint32_t IdCluster = 0x1F43B675u;
+constexpr std::uint32_t IdClusterTimestamp = 0xE7u;
+constexpr std::uint32_t IdSimpleBlock = 0xA3u;
+constexpr std::uint32_t IdSeekHead = 0x114D9B74u;
+constexpr std::uint32_t IdSeek = 0x4DBBu;
+constexpr std::uint32_t IdSeekId = 0x53ABu;
+constexpr std::uint32_t IdSeekPosition = 0x53ACu;
+constexpr std::uint32_t IdVoid = 0xECu;
+constexpr std::uint32_t IdCues = 0x1C53BB6Bu;
+constexpr std::uint32_t IdCuePoint = 0xBBu;
+constexpr std::uint32_t IdCueTime = 0xB3u;
+constexpr std::uint32_t IdCueTrackPositions = 0xB7u;
+constexpr std::uint32_t IdCueTrack = 0xF7u;
+constexpr std::uint32_t IdCueClusterPosition = 0xF1u;
 
-constexpr std::size_t kSeekHeadBytes = 26;
-constexpr std::uint64_t kTimestampScaleNs = 1'000'000;
-constexpr std::uint64_t kMaxClusterDurationMs = 5'000;
-constexpr std::uint64_t kMaxKnownSize8 = ( 1ull << 56u ) - 2u;
+constexpr std::size_t SeekHeadBytes = 26;
+constexpr std::uint64_t TimestampScaleNs = 1'000'000;
+constexpr std::uint64_t MaxClusterDurationMs = 5'000;
+constexpr std::uint64_t MaxKnownSize8 = ( 1ull << 56u ) - 2u;
 
 void AppendId( ByteBuffer& out, const std::uint32_t id )
 {
@@ -234,16 +234,16 @@ bool MkvWriter::Open( std::ofstream&& outStream,
     file.exceptions( std::ios::goodbit );
 
     ByteBuffer ebmlPayload;
-    AppendUintElement( ebmlPayload, kIdEbmlVersion, 1 );
-    AppendUintElement( ebmlPayload, kIdEbmlReadVersion, 1 );
-    AppendUintElement( ebmlPayload, kIdEbmlMaxIdLength, 4 );
-    AppendUintElement( ebmlPayload, kIdEbmlMaxSizeLength, 8 );
-    AppendStringElement( ebmlPayload, kIdDocType, "matroska" );
-    AppendUintElement( ebmlPayload, kIdDocTypeVersion, 4 );
-    AppendUintElement( ebmlPayload, kIdDocTypeReadVersion, 2 );
+    AppendUintElement( ebmlPayload, IdEbmlVersion, 1 );
+    AppendUintElement( ebmlPayload, IdEbmlReadVersion, 1 );
+    AppendUintElement( ebmlPayload, IdEbmlMaxIdLength, 4 );
+    AppendUintElement( ebmlPayload, IdEbmlMaxSizeLength, 8 );
+    AppendStringElement( ebmlPayload, IdDocType, "matroska" );
+    AppendUintElement( ebmlPayload, IdDocTypeVersion, 4 );
+    AppendUintElement( ebmlPayload, IdDocTypeReadVersion, 2 );
 
     ByteBuffer ebml;
-    AppendMasterElement( ebml, kIdEbml, ebmlPayload );
+    AppendMasterElement( ebml, IdEbml, ebmlPayload );
     return WriteBytes( ebml.data(), ebml.size(), "Open" );
 }
 
@@ -266,7 +266,7 @@ bool MkvWriter::SetCodecPrivate( const std::uint8_t* const data,
 bool MkvWriter::WriteHeaders()
 {
     ByteBuffer segment;
-    AppendId( segment, kIdSegment );
+    AppendId( segment, IdSegment );
     if( !WriteBytes( segment.data(), segment.size(), "WriteHeaders/Segment" ) )
         return false;
 
@@ -281,21 +281,21 @@ bool MkvWriter::WriteHeaders()
 
     seekHeadOffset = file.tellp();
     ByteBuffer voidElement;
-    AppendId( voidElement, kIdVoid );
-    AppendSize( voidElement, kSeekHeadBytes - 2 );
-    voidElement.resize( kSeekHeadBytes, 0 );
+    AppendId( voidElement, IdVoid );
+    AppendSize( voidElement, SeekHeadBytes - 2 );
+    voidElement.resize( SeekHeadBytes, 0 );
     if( !WriteBytes( voidElement.data(), voidElement.size(), "WriteHeaders/SeekHeadReservation" ) )
         return false;
 
     ByteBuffer infoPayload;
-    AppendUintElement( infoPayload, kIdTimestampScale, kTimestampScaleNs );
-    AppendStringElement( infoPayload, kIdMuxingApp, "mkv-writer" );
-    AppendStringElement( infoPayload, kIdWritingApp, "mkv-writer" );
+    AppendUintElement( infoPayload, IdTimestampScale, TimestampScaleNs );
+    AppendStringElement( infoPayload, IdMuxingApp, "mkv-writer" );
+    AppendStringElement( infoPayload, IdWritingApp, "mkv-writer" );
     const std::size_t durationOffsetInInfo = infoPayload.size();
-    AppendFloat8Element( infoPayload, kIdDuration, 0.0 );
+    AppendFloat8Element( infoPayload, IdDuration, 0.0 );
 
     ByteBuffer info;
-    AppendMasterElement( info, kIdInfo, infoPayload );
+    AppendMasterElement( info, IdInfo, infoPayload );
     const std::size_t infoPayloadStart = info.size() - infoPayload.size();
     durationPayloadOffset = file.tellp()
         + static_cast< std::streamoff >( infoPayloadStart + durationOffsetInInfo + 3 );
@@ -303,26 +303,26 @@ bool MkvWriter::WriteHeaders()
         return false;
 
     ByteBuffer videoPayload;
-    AppendUintElement( videoPayload, kIdPixelWidth, width );
-    AppendUintElement( videoPayload, kIdPixelHeight, height );
+    AppendUintElement( videoPayload, IdPixelWidth, width );
+    AppendUintElement( videoPayload, IdPixelHeight, height );
 
     ByteBuffer trackPayload;
-    AppendUintElement( trackPayload, kIdTrackNumber, 1 );
-    AppendUintElement( trackPayload, kIdTrackUid, 1 );
-    AppendUintElement( trackPayload, kIdTrackType, 1 );
-    AppendUintElement( trackPayload, kIdFlagLacing, 0 );
-    AppendStringElement( trackPayload, kIdCodecId, codecId );
+    AppendUintElement( trackPayload, IdTrackNumber, 1 );
+    AppendUintElement( trackPayload, IdTrackUid, 1 );
+    AppendUintElement( trackPayload, IdTrackType, 1 );
+    AppendUintElement( trackPayload, IdFlagLacing, 0 );
+    AppendStringElement( trackPayload, IdCodecId, codecId );
     AppendUintElement( trackPayload,
-                       kIdDefaultDuration,
+                       IdDefaultDuration,
                        static_cast< std::uint64_t >( std::llround( 1e9 / fps ) ) );
     if( !codecPrivate.empty() )
-        AppendBinaryElement( trackPayload, kIdCodecPrivate, codecPrivate );
-    AppendMasterElement( trackPayload, kIdVideo, videoPayload );
+        AppendBinaryElement( trackPayload, IdCodecPrivate, codecPrivate );
+    AppendMasterElement( trackPayload, IdVideo, videoPayload );
 
     ByteBuffer trackEntry;
-    AppendMasterElement( trackEntry, kIdTrackEntry, trackPayload );
+    AppendMasterElement( trackEntry, IdTrackEntry, trackPayload );
     ByteBuffer tracks;
-    AppendMasterElement( tracks, kIdTracks, trackEntry );
+    AppendMasterElement( tracks, IdTracks, trackEntry );
     if( !WriteBytes( tracks.data(), tracks.size(), "WriteHeaders/Tracks" ) )
         return false;
 
@@ -332,7 +332,7 @@ bool MkvWriter::WriteHeaders()
 
 bool MkvWriter::PatchSize8( const std::streampos offset, const std::uint64_t size )
 {
-    if( size > kMaxKnownSize8 )
+    if( size > MaxKnownSize8 )
         return Fail( "PatchSize8: element exceeds the 8-byte EBML size limit" );
 
     std::uint8_t bytes[ 8 ]{};
@@ -378,7 +378,7 @@ bool MkvWriter::WriteFrame( const void* const data,
         return Reject( "WriteFrame: writer is not open" );
     if( data == nullptr || size == 0 )
         return Reject( "WriteFrame: packet must not be empty" );
-    if( size > kMaxKnownSize8 - 4 )
+    if( size > MaxKnownSize8 - 4 )
         return Reject( "WriteFrame: packet exceeds the EBML element size limit" );
     if( frameCount != 0 && timestampMs < lastTimestampMs )
         return Reject( "WriteFrame: timestamps must be monotonic" );
@@ -386,7 +386,7 @@ bool MkvWriter::WriteFrame( const void* const data,
         return false;
 
     if( clusterOpen
-        && ( keyframe || timestampMs - clusterStartMs >= kMaxClusterDurationMs )
+        && ( keyframe || timestampMs - clusterStartMs >= MaxClusterDurationMs )
         && !FlushCluster() )
         return false;
 
@@ -404,7 +404,7 @@ bool MkvWriter::WriteFrame( const void* const data,
 
         clusterStartMs = timestampMs;
         ByteBuffer header;
-        AppendId( header, kIdCluster );
+        AppendId( header, IdCluster );
         if( !WriteBytes( header.data(), header.size(), "WriteFrame/Cluster" ) )
             return false;
 
@@ -416,7 +416,7 @@ bool MkvWriter::WriteFrame( const void* const data,
             return false;
 
         header.clear();
-        AppendUintElement( header, kIdClusterTimestamp, clusterStartMs );
+        AppendUintElement( header, IdClusterTimestamp, clusterStartMs );
         if( !WriteBytes( header.data(), header.size(), "WriteFrame/ClusterTimestamp" ) )
             return false;
         clusterOpen = true;
@@ -427,7 +427,7 @@ bool MkvWriter::WriteFrame( const void* const data,
         return Reject( "WriteFrame: relative cluster timestamp exceeds int16 range" );
 
     blockHeader.clear();
-    AppendId( blockHeader, kIdSimpleBlock );
+    AppendId( blockHeader, IdSimpleBlock );
     AppendSize( blockHeader, size + 4 );
     blockHeader.push_back( 0x81 );
     blockHeader.push_back( static_cast< std::uint8_t >( relative >> 8 ) );
@@ -468,32 +468,32 @@ bool MkvWriter::Finalize()
             for( const auto& [ timeMs, clusterPosition ] : cuePoints )
             {
                 ByteBuffer trackPositionPayload;
-                AppendUintElement( trackPositionPayload, kIdCueTrack, 1 );
-                AppendUintElement( trackPositionPayload, kIdCueClusterPosition, clusterPosition );
+                AppendUintElement( trackPositionPayload, IdCueTrack, 1 );
+                AppendUintElement( trackPositionPayload, IdCueClusterPosition, clusterPosition );
 
                 ByteBuffer pointPayload;
-                AppendUintElement( pointPayload, kIdCueTime, timeMs );
-                AppendMasterElement( pointPayload, kIdCueTrackPositions, trackPositionPayload );
-                AppendMasterElement( cuesPayload, kIdCuePoint, pointPayload );
+                AppendUintElement( pointPayload, IdCueTime, timeMs );
+                AppendMasterElement( pointPayload, IdCueTrackPositions, trackPositionPayload );
+                AppendMasterElement( cuesPayload, IdCuePoint, pointPayload );
             }
 
             ByteBuffer cues;
-            AppendMasterElement( cues, kIdCues, cuesPayload );
+            AppendMasterElement( cues, IdCues, cuesPayload );
             success = WriteBytes( cues.data(), cues.size(), "Finalize/Cues" );
 
             if( success )
             {
                 ByteBuffer seekEntry;
-                AppendId( seekEntry, kIdSeekId );
+                AppendId( seekEntry, IdSeekId );
                 AppendSize( seekEntry, 4 );
-                AppendId( seekEntry, kIdCues );
-                AppendUintElementFixed8( seekEntry, kIdSeekPosition, cuesPosition );
+                AppendId( seekEntry, IdCues );
+                AppendUintElementFixed8( seekEntry, IdSeekPosition, cuesPosition );
 
                 ByteBuffer seekPayload;
-                AppendMasterElement( seekPayload, kIdSeek, seekEntry );
+                AppendMasterElement( seekPayload, IdSeek, seekEntry );
                 ByteBuffer seekHead;
-                AppendMasterElement( seekHead, kIdSeekHead, seekPayload );
-                if( seekHead.size() != kSeekHeadBytes )
+                AppendMasterElement( seekHead, IdSeekHead, seekPayload );
+                if( seekHead.size() != SeekHeadBytes )
                 {
                     success = Fail( "Finalize: internal SeekHead reservation mismatch" );
                 }

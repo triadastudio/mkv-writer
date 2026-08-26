@@ -15,7 +15,7 @@
 namespace {
 
 using Bytes = std::vector< std::uint8_t >;
-constexpr std::size_t kNotFound = std::numeric_limits< std::size_t >::max();
+constexpr std::size_t NotFound = std::numeric_limits< std::size_t >::max();
 
 void Require( const bool condition, const std::string_view message )
 {
@@ -37,7 +37,7 @@ template< std::size_t Size >
 std::size_t Find( const Bytes& bytes, const std::array< std::uint8_t, Size >& pattern )
 {
     const auto found = std::search( bytes.begin(), bytes.end(), pattern.begin(), pattern.end() );
-    return found == bytes.end() ? kNotFound : static_cast< std::size_t >( found - bytes.begin() );
+    return found == bytes.end() ? NotFound : static_cast< std::size_t >( found - bytes.begin() );
 }
 
 struct Element
@@ -149,14 +149,14 @@ void TestWritesAndFinalizesMatroska()
 
     Require( Find( bytes, ebml ) == 0, "missing EBML header" );
     const auto segmentOffset = Find( bytes, segment );
-    Require( segmentOffset != kNotFound, "missing Segment" );
-    Require( Find( bytes, tracks ) != kNotFound, "missing Tracks" );
+    Require( segmentOffset != NotFound, "missing Segment" );
+    Require( Find( bytes, tracks ) != NotFound, "missing Tracks" );
     const auto clusterOffset = Find( bytes, cluster );
-    Require( clusterOffset != kNotFound, "missing Cluster" );
-    Require( Find( bytes, cues ) != kNotFound, "missing Cues" );
-    Require( Find( bytes, seekHead ) != kNotFound, "missing SeekHead" );
-    Require( Find( bytes, codecPrivate ) != kNotFound, "missing codec-private bytes" );
-    Require( Find( bytes, keyframe ) != kNotFound, "missing packet bytes" );
+    Require( clusterOffset != NotFound, "missing Cluster" );
+    Require( Find( bytes, cues ) != NotFound, "missing Cues" );
+    Require( Find( bytes, seekHead ) != NotFound, "missing SeekHead" );
+    Require( Find( bytes, codecPrivate ) != NotFound, "missing codec-private bytes" );
+    Require( Find( bytes, keyframe ) != NotFound, "missing packet bytes" );
 
     const auto isUnknownSize = [ &bytes ]( const std::size_t offset ) {
         constexpr std::array unknown = { std::uint8_t{ 0x01 }, std::uint8_t{ 0xFF }, std::uint8_t{ 0xFF }, std::uint8_t{ 0xFF }, std::uint8_t{ 0xFF }, std::uint8_t{ 0xFF }, std::uint8_t{ 0xFF }, std::uint8_t{ 0xFF } };
@@ -165,11 +165,11 @@ void TestWritesAndFinalizesMatroska()
     Require( !isUnknownSize( segmentOffset + segment.size() ), "Segment size was not patched" );
     Require( !isUnknownSize( clusterOffset + cluster.size() ), "Cluster size was not patched" );
 
-    constexpr std::uint32_t kIdCluster = 0x1F43B675u;
-    constexpr std::uint32_t kIdCues = 0x1C53BB6Bu;
-    constexpr std::uint32_t kIdCuePoint = 0xBBu;
+    constexpr std::uint32_t IdCluster = 0x1F43B675u;
+    constexpr std::uint32_t IdCues = 0x1C53BB6Bu;
+    constexpr std::uint32_t IdCuePoint = 0xBBu;
     const Element segmentElement = ReadElement( bytes, segmentOffset, bytes.size() );
-    Require( CountChildren( bytes, segmentElement, kIdCluster ) == 2,
+    Require( CountChildren( bytes, segmentElement, IdCluster ) == 2,
              "expected one cluster per keyframe" );
 
     std::size_t cuePointCount = 0;
@@ -177,8 +177,8 @@ void TestWritesAndFinalizesMatroska()
     while( childOffset < segmentElement.End() )
     {
         const Element child = ReadElement( bytes, childOffset, segmentElement.End() );
-        if( child.id == kIdCues )
-            cuePointCount += CountChildren( bytes, child, kIdCuePoint );
+        if( child.id == IdCues )
+            cuePointCount += CountChildren( bytes, child, IdCuePoint );
         childOffset = child.End();
     }
     Require( cuePointCount == 2, "expected one cue point per keyframe" );
@@ -232,7 +232,7 @@ void TestClearsCodecPrivate()
     constexpr std::array< std::uint8_t, 1 > packet = { 0x01 };
     RequireSuccess( writer.WriteFrame( packet.data(), packet.size(), 0, true ), writer );
     RequireSuccess( writer.Finalize(), writer );
-    Require( Find( ReadAll( path ), codecPrivate ) == kNotFound,
+    Require( Find( ReadAll( path ), codecPrivate ) == NotFound,
              "cleared codec-private bytes were written" );
     std::filesystem::remove( path );
 }
@@ -279,8 +279,8 @@ void TestDestructorFinalizesEmptyFile()
     const Bytes bytes = ReadAll( path );
     constexpr std::array segment = { std::uint8_t{ 0x18 }, std::uint8_t{ 0x53 }, std::uint8_t{ 0x80 }, std::uint8_t{ 0x67 } };
     constexpr std::array tracks = { std::uint8_t{ 0x16 }, std::uint8_t{ 0x54 }, std::uint8_t{ 0xAE }, std::uint8_t{ 0x6B } };
-    Require( Find( bytes, segment ) != kNotFound, "destructor did not write Segment" );
-    Require( Find( bytes, tracks ) != kNotFound, "destructor did not write Tracks" );
+    Require( Find( bytes, segment ) != NotFound, "destructor did not write Segment" );
+    Require( Find( bytes, tracks ) != NotFound, "destructor did not write Tracks" );
     std::filesystem::remove( path );
 }
 
