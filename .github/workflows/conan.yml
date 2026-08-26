@@ -12,15 +12,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: windows-2022
-            build_type: Release
-          - os: windows-2022
-            build_type: Debug
-          - os: ubuntu-24.04
-            build_type: Release
-          - os: macos-14
-            build_type: Release
+        os: [windows-2022, ubuntu-24.04, macos-14]
+        build_type: [Debug, Release, RelWithDebInfo, MinSizeRel]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
