@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -186,6 +187,140 @@ void TestWritesAndFinalizesMatroska()
     std::filesystem::remove( path );
 }
 
+void TestWritesInterleavedAudioTrack()
+{
+    const auto path = TestPath( "mkv-writer-audio-track-test" );
+    std::filesystem::remove( path );
+
+    mkv_writer::MkvWriter writer;
+    RequireSuccess(
+        writer.Open( std::ofstream( path, std::ios::binary ), 320, 180, 60.0f, "V_AV1" ),
+        writer );
+    RequireSuccess( writer.SetAudioTrack( 1000, 2 ), writer );
+
+    constexpr std::array< std::uint8_t, 5 > keyframe = { 0xAA, 0x10, 0x20, 0x30, 0xBB };
+    constexpr std::array< std::uint8_t, 4 > delta = { 0xCC, 0x40, 0x50, 0xDD };
+    constexpr std::array< float, 8 > block = {
+        0.5f, -1.0f, 0.25f, -0.125f, 0.75f, -0.375f, 1.0f, -0.5f
+    };
+    const std::vector< float > tail( 200, 0.125f );
+
+    RequireSuccess( writer.WriteFrame( keyframe.data(), keyframe.size(), 0, true ), writer );
+    RequireSuccess( writer.WriteAudio( block.data(), block.size() / 2, 0 ), writer );
+    RequireSuccess( writer.WriteFrame( delta.data(), delta.size(), 17, false ), writer );
+    RequireSuccess( writer.WriteAudio( block.data(), block.size() / 2, 17 ), writer );
+    RequireSuccess( writer.WriteFrame( keyframe.data(), keyframe.size(), 34, true ), writer );
+    // Trails the cluster the video keyframe just opened: negative relative timestamp.
+    RequireSuccess( writer.WriteAudio( tail.data(), tail.size() / 2, 30 ), writer );
+    RequireSuccess( writer.Finalize(), writer );
+
+    const Bytes bytes = ReadAll( path );
+    constexpr std::array segment = { std::uint8_t{ 0x18 }, std::uint8_t{ 0x53 }, std::uint8_t{ 0x80 }, std::uint8_t{ 0x67 } };
+    constexpr std::array pcmCodec = {
+        std::uint8_t{ 'A' }, std::uint8_t{ '_' }, std::uint8_t{ 'P' }, std::uint8_t{ 'C' },
+        std::uint8_t{ 'M' }, std::uint8_t{ '/' }, std::uint8_t{ 'F' }, std::uint8_t{ 'L' },
+        std::uint8_t{ 'O' }, std::uint8_t{ 'A' }, std::uint8_t{ 'T' }, std::uint8_t{ '/' },
+        std::uint8_t{ 'I' }, std::uint8_t{ 'E' }, std::uint8_t{ 'E' }, std::uint8_t{ 'E' }
+    };
+    Require( Find( bytes, pcmCodec ) != NotFound, "missing PCM codec ID" );
+
+    std::array< std::uint8_t, sizeof( block ) > blockBytes{};
+    std::memcpy( blockBytes.data(), block.data(), sizeof( block ) );
+    Require( Find( bytes, blockBytes ) != NotFound, "missing audio sample bytes" );
+
+    constexpr std::uint32_t IdTracks = 0x1654AE6Bu;
+    constexpr std::uint32_t IdTrackEntry = 0xAEu;
+    constexpr std::uint32_t IdInfo = 0x1549A966u;
+    constexpr std::uint32_t IdDuration = 0x4489u;
+    constexpr std::uint32_t IdCluster = 0x1F43B675u;
+    constexpr std::uint32_t IdSimpleBlock = 0xA3u;
+    constexpr std::uint32_t IdCues = 0x1C53BB6Bu;
+    constexpr std::uint32_t IdCuePoint = 0xBBu;
+
+    const auto segmentOffset = Find( bytes, segment );
+    Require( segmentOffset != NotFound, "missing Segment" );
+    const Element segmentElement = ReadElement( bytes, segmentOffset, bytes.size() );
+
+    std::size_t trackEntryCount = 0;
+    std::size_t simpleBlockCount = 0;
+    std::size_t cuePointCount = 0;
+    double durationMs = 0.0;
+    std::size_t childOffset = segmentElement.payloadOffset;
+    while( childOffset < segmentElement.End() )
+    {
+        const Element child = ReadElement( bytes, childOffset, segmentElement.End() );
+        if( child.id == IdTracks )
+            trackEntryCount = CountChildren( bytes, child, IdTrackEntry );
+        if( child.id == IdCluster )
+            simpleBlockCount += CountChildren( bytes, child, IdSimpleBlock );
+        if( child.id == IdCues )
+            cuePointCount = CountChildren( bytes, child, IdCuePoint );
+        if( child.id == IdInfo )
+        {
+            std::size_t infoOffset = child.payloadOffset;
+            while( infoOffset < child.End() )
+            {
+                const Element infoChild = ReadElement( bytes, infoOffset, child.End() );
+                if( infoChild.id == IdDuration )
+                {
+                    Require( infoChild.payloadSize == 8, "unexpected Duration size" );
+                    std::uint64_t bits = 0;
+                    for( std::size_t i = 0; i < 8; ++i )
+                        bits = ( bits << 8u ) | bytes[ infoChild.payloadOffset + i ];
+                    std::memcpy( &durationMs, &bits, sizeof( durationMs ) );
+                }
+                infoOffset = infoChild.End();
+            }
+        }
+        childOffset = child.End();
+    }
+
+    Require( trackEntryCount == 2, "expected a video and an audio track entry" );
+    Require( simpleBlockCount == 6, "expected three video and three audio blocks" );
+    Require( cuePointCount == 2, "audio blocks must not add cue points" );
+    // Last audio block: 100 frames at 1 kHz from 30 ms, past the video end.
+    Require( durationMs == 130.0, "duration does not cover the audio tail" );
+
+    std::filesystem::remove( path );
+}
+
+void TestRejectsAudioMisuse()
+{
+    const auto path = TestPath( "mkv-writer-audio-misuse-test" );
+    const auto secondPath = TestPath( "mkv-writer-audio-misuse-second-test" );
+    std::filesystem::remove( path );
+    std::filesystem::remove( secondPath );
+
+    constexpr std::array< float, 4 > block = { 0.1f, -0.1f, 0.2f, -0.2f };
+
+    mkv_writer::MkvWriter writer;
+    RequireSuccess(
+        writer.Open( std::ofstream( path, std::ios::binary ), 64, 64, 30.0f, "V_AV1" ),
+        writer );
+    Require( !writer.SetAudioTrack( 0, 2 ), "zero sample rate was accepted" );
+    Require( !writer.SetAudioTrack( 48000, 0 ), "zero channel count was accepted" );
+    Require( !writer.WriteAudio( block.data(), block.size() / 2, 0 ),
+             "audio without SetAudioTrack was accepted" );
+
+    RequireSuccess( writer.SetAudioTrack( 48000, 2 ), writer );
+    RequireSuccess( writer.WriteAudio( block.data(), block.size() / 2, 100 ), writer );
+    Require( !writer.SetAudioTrack( 44100, 2 ), "late SetAudioTrack was accepted" );
+    Require( !writer.WriteAudio( nullptr, 2, 200 ), "null audio block was accepted" );
+    Require( !writer.WriteAudio( block.data(), block.size() / 2, 50 ),
+             "non-monotonic audio timestamp was accepted" );
+    RequireSuccess( writer.Finalize(), writer );
+
+    RequireSuccess(
+        writer.Open( std::ofstream( secondPath, std::ios::binary ), 64, 64, 30.0f, "V_AV1" ),
+        writer );
+    Require( !writer.WriteAudio( block.data(), block.size() / 2, 0 ),
+             "Open did not reset the audio track" );
+    RequireSuccess( writer.Finalize(), writer );
+
+    std::filesystem::remove( path );
+    std::filesystem::remove( secondPath );
+}
+
 void TestRejectsInvalidCallOrderAndTimestamps()
 {
     const auto path = TestPath( "mkv-writer-validation-test" );
@@ -291,6 +426,8 @@ int main()
     try
     {
         TestWritesAndFinalizesMatroska();
+        TestWritesInterleavedAudioTrack();
+        TestRejectsAudioMisuse();
         TestRejectsInvalidCallOrderAndTimestamps();
         TestClearsCodecPrivate();
         TestReusesWriterAfterFinalize();
