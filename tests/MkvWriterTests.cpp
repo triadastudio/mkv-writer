@@ -1,6 +1,7 @@
 #include <MkvWriter.h>
 #include <algorithm>
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <filesystem>
@@ -32,6 +33,11 @@ void RequireSuccess( const bool success, const mkv_writer::MkvWriter& writer )
         throw std::runtime_error(
             error.empty() ? "writer operation failed without a diagnostic" : std::string( error ) );
     }
+}
+
+const std::byte* AsBytes( const std::uint8_t* const data )
+{
+    return reinterpret_cast< const std::byte* >( data );
 }
 
 template< std::size_t Size >
@@ -132,9 +138,9 @@ void TestWritesAndFinalizesMatroska()
 
     constexpr std::array< std::uint8_t, 5 > keyframe = { 0xAA, 0x10, 0x20, 0x30, 0xBB };
     constexpr std::array< std::uint8_t, 4 > delta = { 0xCC, 0x40, 0x50, 0xDD };
-    RequireSuccess( writer.WriteFrame( keyframe.data(), keyframe.size(), 0, true ), writer );
-    RequireSuccess( writer.WriteFrame( delta.data(), delta.size(), 17, false ), writer );
-    RequireSuccess( writer.WriteFrame( keyframe.data(), keyframe.size(), 34, true ), writer );
+    RequireSuccess( writer.WriteFrame( AsBytes( keyframe.data() ), keyframe.size(), 0, true ), writer );
+    RequireSuccess( writer.WriteFrame( AsBytes( delta.data() ), delta.size(), 17, false ), writer );
+    RequireSuccess( writer.WriteFrame( AsBytes( keyframe.data() ), keyframe.size(), 34, true ), writer );
     Require( writer.GetWrittenFrameCount() == 3, "unexpected frame count" );
     RequireSuccess( writer.Finalize(), writer );
     Require( !writer.IsOpen(), "Finalize did not close output" );
@@ -205,11 +211,11 @@ void TestWritesInterleavedAudioTrack()
     };
     const std::vector< float > tail( 200, 0.125f );
 
-    RequireSuccess( writer.WriteFrame( keyframe.data(), keyframe.size(), 0, true ), writer );
+    RequireSuccess( writer.WriteFrame( AsBytes( keyframe.data() ), keyframe.size(), 0, true ), writer );
     RequireSuccess( writer.WriteAudio( block.data(), block.size() / 2, 0 ), writer );
-    RequireSuccess( writer.WriteFrame( delta.data(), delta.size(), 17, false ), writer );
+    RequireSuccess( writer.WriteFrame( AsBytes( delta.data() ), delta.size(), 17, false ), writer );
     RequireSuccess( writer.WriteAudio( block.data(), block.size() / 2, 17 ), writer );
-    RequireSuccess( writer.WriteFrame( keyframe.data(), keyframe.size(), 34, true ), writer );
+    RequireSuccess( writer.WriteFrame( AsBytes( keyframe.data() ), keyframe.size(), 34, true ), writer );
     // Trails the cluster the video keyframe just opened: negative relative timestamp.
     RequireSuccess( writer.WriteAudio( tail.data(), tail.size() / 2, 30 ), writer );
     RequireSuccess( writer.Finalize(), writer );
@@ -217,10 +223,7 @@ void TestWritesInterleavedAudioTrack()
     const Bytes bytes = ReadAll( path );
     constexpr std::array segment = { std::uint8_t{ 0x18 }, std::uint8_t{ 0x53 }, std::uint8_t{ 0x80 }, std::uint8_t{ 0x67 } };
     constexpr std::array pcmCodec = {
-        std::uint8_t{ 'A' }, std::uint8_t{ '_' }, std::uint8_t{ 'P' }, std::uint8_t{ 'C' },
-        std::uint8_t{ 'M' }, std::uint8_t{ '/' }, std::uint8_t{ 'F' }, std::uint8_t{ 'L' },
-        std::uint8_t{ 'O' }, std::uint8_t{ 'A' }, std::uint8_t{ 'T' }, std::uint8_t{ '/' },
-        std::uint8_t{ 'I' }, std::uint8_t{ 'E' }, std::uint8_t{ 'E' }, std::uint8_t{ 'E' }
+        std::uint8_t{ 'A' }, std::uint8_t{ '_' }, std::uint8_t{ 'P' }, std::uint8_t{ 'C' }, std::uint8_t{ 'M' }, std::uint8_t{ '/' }, std::uint8_t{ 'F' }, std::uint8_t{ 'L' }, std::uint8_t{ 'O' }, std::uint8_t{ 'A' }, std::uint8_t{ 'T' }, std::uint8_t{ '/' }, std::uint8_t{ 'I' }, std::uint8_t{ 'E' }, std::uint8_t{ 'E' }, std::uint8_t{ 'E' }
     };
     Require( Find( bytes, pcmCodec ) != NotFound, "missing PCM codec ID" );
 
@@ -243,6 +246,8 @@ void TestWritesInterleavedAudioTrack()
 
     std::size_t trackEntryCount = 0;
     std::size_t simpleBlockCount = 0;
+    std::size_t clusterCount = 0;
+    Element lastCluster;
     std::size_t cuePointCount = 0;
     double durationMs = 0.0;
     std::size_t childOffset = segmentElement.payloadOffset;
@@ -252,7 +257,11 @@ void TestWritesInterleavedAudioTrack()
         if( child.id == IdTracks )
             trackEntryCount = CountChildren( bytes, child, IdTrackEntry );
         if( child.id == IdCluster )
+        {
+            ++clusterCount;
+            lastCluster = child;
             simpleBlockCount += CountChildren( bytes, child, IdSimpleBlock );
+        }
         if( child.id == IdCues )
             cuePointCount = CountChildren( bytes, child, IdCuePoint );
         if( child.id == IdInfo )
@@ -277,7 +286,24 @@ void TestWritesInterleavedAudioTrack()
 
     Require( trackEntryCount == 2, "expected a video and an audio track entry" );
     Require( simpleBlockCount == 6, "expected three video and three audio blocks" );
+    Require( clusterCount == 2, "the trailing audio block must not rotate the cluster" );
     Require( cuePointCount == 2, "audio blocks must not add cue points" );
+
+    // Audio at 30 rides the cluster the keyframe opened at 34: relative -4.
+    bool trailingAudioFound = false;
+    std::size_t blockOffset = lastCluster.payloadOffset;
+    while( blockOffset < lastCluster.End() )
+    {
+        const Element simpleBlock = ReadElement( bytes, blockOffset, lastCluster.End() );
+        if( simpleBlock.id == IdSimpleBlock && bytes[ simpleBlock.payloadOffset ] == 0x82u )
+        {
+            const auto relativeBits = static_cast< std::uint16_t >(
+                ( bytes[ simpleBlock.payloadOffset + 1 ] << 8u ) | bytes[ simpleBlock.payloadOffset + 2 ] );
+            trailingAudioFound = static_cast< std::int16_t >( relativeBits ) == -4;
+        }
+        blockOffset = simpleBlock.End();
+    }
+    Require( trailingAudioFound, "the trailing audio block lost its negative relative timestamp" );
     // Last audio block: 100 frames at 1 kHz from 30 ms, past the video end.
     Require( durationMs == 130.0, "duration does not cover the audio tail" );
 
@@ -328,21 +354,21 @@ void TestRejectsInvalidCallOrderAndTimestamps()
 
     mkv_writer::MkvWriter unopened;
     constexpr std::array< std::uint8_t, 1 > packet = { 0x01 };
-    Require( !unopened.WriteFrame( packet.data(), packet.size(), 0, true ),
+    Require( !unopened.WriteFrame( AsBytes( packet.data() ), packet.size(), 0, true ),
              "unopened writer accepted a packet" );
 
     mkv_writer::MkvWriter writer;
     RequireSuccess(
         writer.Open( std::ofstream( path, std::ios::binary ), 64, 64, 30.0f, "V_AV1" ),
         writer );
-    RequireSuccess( writer.WriteFrame( packet.data(), packet.size(), 10, true ), writer );
+    RequireSuccess( writer.WriteFrame( AsBytes( packet.data() ), packet.size(), 10, true ), writer );
     Require( !writer.SetCodecPrivate( packet.data(), packet.size() ),
              "late codec-private data was accepted" );
     const std::string firstError( writer.LastError() );
-    Require( !writer.WriteFrame( packet.data(), packet.size(), 9, false ),
+    Require( !writer.WriteFrame( AsBytes( packet.data() ), packet.size(), 9, false ),
              "non-monotonic timestamp was accepted" );
     Require( writer.LastError() == firstError, "writer did not preserve the first error" );
-    RequireSuccess( writer.WriteFrame( packet.data(), packet.size(), 20, false ), writer );
+    RequireSuccess( writer.WriteFrame( AsBytes( packet.data() ), packet.size(), 20, false ), writer );
     RequireSuccess( writer.Finalize(), writer );
     Require( !writer.LastError().empty(), "validation failure has no diagnostic" );
 
@@ -365,7 +391,7 @@ void TestClearsCodecPrivate()
     RequireSuccess( writer.SetCodecPrivate( nullptr, 0 ), writer );
 
     constexpr std::array< std::uint8_t, 1 > packet = { 0x01 };
-    RequireSuccess( writer.WriteFrame( packet.data(), packet.size(), 0, true ), writer );
+    RequireSuccess( writer.WriteFrame( AsBytes( packet.data() ), packet.size(), 0, true ), writer );
     RequireSuccess( writer.Finalize(), writer );
     Require( Find( ReadAll( path ), codecPrivate ) == NotFound,
              "cleared codec-private bytes were written" );
@@ -384,7 +410,7 @@ void TestReusesWriterAfterFinalize()
     RequireSuccess(
         writer.Open( std::ofstream( firstPath, std::ios::binary ), 64, 64, 30.0f, "V_AV1" ),
         writer );
-    RequireSuccess( writer.WriteFrame( packet.data(), packet.size(), 0, true ), writer );
+    RequireSuccess( writer.WriteFrame( AsBytes( packet.data() ), packet.size(), 0, true ), writer );
     RequireSuccess( writer.Finalize(), writer );
 
     RequireSuccess(
@@ -392,7 +418,7 @@ void TestReusesWriterAfterFinalize()
         writer );
     Require( writer.GetWrittenFrameCount() == 0, "Open did not reset the frame count" );
     Require( writer.LastError().empty(), "Open did not reset the prior error state" );
-    RequireSuccess( writer.WriteFrame( packet.data(), packet.size(), 0, true ), writer );
+    RequireSuccess( writer.WriteFrame( AsBytes( packet.data() ), packet.size(), 0, true ), writer );
     RequireSuccess( writer.Finalize(), writer );
     Require( writer.GetWrittenFrameCount() == 1, "reused writer has an invalid frame count" );
 

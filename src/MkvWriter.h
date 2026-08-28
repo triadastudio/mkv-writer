@@ -42,7 +42,7 @@ public:
     bool SetAudioTrack( const std::uint32_t sampleRate,
                         const std::uint32_t channelCount );
 
-    bool WriteFrame( const void* const data,
+    bool WriteFrame( const std::byte* const data,
                      const std::size_t size,
                      const std::uint64_t timestampMs,
                      const bool keyframe );
@@ -72,7 +72,7 @@ private:
     bool FlushCluster();
     bool EnsureCluster( const std::uint64_t timestampMs, const bool cueKeyframe );
     bool WriteSimpleBlock( const std::uint8_t trackNumber,
-                           const void* const data,
+                           const std::byte* const data,
                            const std::size_t size,
                            const std::uint64_t timestampMs,
                            const bool keyframe,

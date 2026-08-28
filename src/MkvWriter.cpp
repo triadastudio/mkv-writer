@@ -352,13 +352,13 @@ bool MkvWriter::WriteHeaders()
         ByteBuffer audioPayload;
         AppendFloat8Element( audioPayload, IdSamplingFrequency, static_cast< double >( audioSampleRate ) );
         AppendUintElement( audioPayload, IdChannels, audioChannelCount );
-        AppendUintElement( audioPayload, IdBitDepth, 32 );
+        AppendUintElement( audioPayload, IdBitDepth, 32u );
 
         ByteBuffer audioTrackPayload;
-        AppendUintElement( audioTrackPayload, IdTrackNumber, 2 );
-        AppendUintElement( audioTrackPayload, IdTrackUid, 2 );
-        AppendUintElement( audioTrackPayload, IdTrackType, 2 );
-        AppendUintElement( audioTrackPayload, IdFlagLacing, 0 );
+        AppendUintElement( audioTrackPayload, IdTrackNumber, 2u );
+        AppendUintElement( audioTrackPayload, IdTrackUid, 2u );
+        AppendUintElement( audioTrackPayload, IdTrackType, 2u );
+        AppendUintElement( audioTrackPayload, IdFlagLacing, 0u );
         AppendStringElement( audioTrackPayload, IdCodecId, "A_PCM/FLOAT/IEEE" );
         AppendMasterElement( audioTrackPayload, IdAudio, audioPayload );
         AppendMasterElement( trackEntries, IdTrackEntry, audioTrackPayload );
@@ -449,7 +449,7 @@ bool MkvWriter::EnsureCluster( const std::uint64_t timestampMs, const bool cueKe
 }
 
 bool MkvWriter::WriteSimpleBlock( const std::uint8_t trackNumber,
-                                  const void* const data,
+                                  const std::byte* const data,
                                   const std::size_t size,
                                   const std::uint64_t timestampMs,
                                   const bool keyframe,
@@ -474,7 +474,7 @@ bool MkvWriter::WriteSimpleBlock( const std::uint8_t trackNumber,
         && WriteBytes( data, size, operation );
 }
 
-bool MkvWriter::WriteFrame( const void* const data,
+bool MkvWriter::WriteFrame( const std::byte* const data,
                             const std::size_t size,
                             const std::uint64_t timestampMs,
                             const bool keyframe )
@@ -491,14 +491,14 @@ bool MkvWriter::WriteFrame( const void* const data,
         return false;
 
     if( clusterOpen
-        && ( keyframe || timestampMs - clusterStartMs >= MaxClusterDurationMs )
+        && ( keyframe || timestampMs >= clusterStartMs + MaxClusterDurationMs )
         && !FlushCluster() )
         return false;
 
     if( !EnsureCluster( timestampMs, keyframe ) )
         return false;
 
-    if( !WriteSimpleBlock( 1, data, size, timestampMs, keyframe, "WriteFrame" ) )
+    if( !WriteSimpleBlock( 1u, data, size, timestampMs, keyframe, "WriteFrame" ) )
         return false;
 
     ++frameCount;
@@ -525,7 +525,7 @@ bool MkvWriter::WriteAudio( const float* const samples,
         return false;
 
     if( clusterOpen
-        && timestampMs - clusterStartMs >= MaxClusterDurationMs
+        && timestampMs >= clusterStartMs + MaxClusterDurationMs
         && !FlushCluster() )
         return false;
 
@@ -533,7 +533,8 @@ bool MkvWriter::WriteAudio( const float* const samples,
         return false;
 
     // PCM blocks decode independently, every one is a keyframe.
-    if( !WriteSimpleBlock( 2, samples, sampleFrameCount * bytesPerFrame, timestampMs, true, "WriteAudio" ) )
+    const auto* const data = reinterpret_cast< const std::byte* >( samples );
+    if( !WriteSimpleBlock( 2u, data, sampleFrameCount * bytesPerFrame, timestampMs, true, "WriteAudio" ) )
         return false;
 
     audioFrameCount += sampleFrameCount;
