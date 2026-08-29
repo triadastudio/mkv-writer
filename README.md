@@ -78,7 +78,7 @@ conan profile detect --force
 conan create conan -s build_type=Release -s compiler.cppstd=17 --build=missing
 ```
 
-Consume `mkv-writer/0.2.0` through `CMakeDeps` and link the same
+Consume `mkv-writer/0.3.0` through `CMakeDeps` and link the same
 `mkv-writer::mkv-writer` target shown above.
 
 ## License
