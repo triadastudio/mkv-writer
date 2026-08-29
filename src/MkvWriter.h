@@ -91,8 +91,8 @@ private:
 
     std::uint32_t width = 0;
     std::uint32_t height = 0;
-    std::uint32_t fpsNum = 60;
-    std::uint32_t fpsDen = 1;
+    std::uint32_t fpsNum = 60u;
+    std::uint32_t fpsDen = 1u;
     std::string codecId;
     std::vector< std::uint8_t > codecPrivate;
 

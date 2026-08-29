@@ -220,7 +220,7 @@ bool MkvWriter::Open( std::ofstream&& outStream,
     if( newWidth == 0 || newHeight == 0 )
         return Reject( "Open: dimensions must be non-zero" );
     if( newFpsNum == 0 || newFpsDen == 0 )
-        return Reject( "Open: fps numerator and denominator must be non-zero" );
+        return Reject( "Open: fps numerator and denominator must be positive" );
     if( newCodecId.empty() )
         return Reject( "Open: codec ID must not be empty" );
 
