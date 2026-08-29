@@ -1,6 +1,7 @@
 #include <MkvWriter.h>
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -15,7 +16,7 @@ int main()
         return 1;
 
     constexpr std::array< std::uint8_t, 3 > packet = { 0x01, 0x02, 0x03 };
-    if( !writer.WriteFrame( packet.data(), packet.size(), 0, true ) )
+    if( !writer.WriteFrame( reinterpret_cast< const std::byte* >( packet.data() ), packet.size(), 0, true ) )
         return 2;
     if( !writer.Finalize() )
         return 3;

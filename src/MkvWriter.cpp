@@ -1,5 +1,6 @@
 #include "MkvWriter.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <limits>
@@ -36,6 +37,10 @@ constexpr std::uint32_t IdDefaultDuration = 0x23E383u;
 constexpr std::uint32_t IdVideo = 0xE0u;
 constexpr std::uint32_t IdPixelWidth = 0xB0u;
 constexpr std::uint32_t IdPixelHeight = 0xBAu;
+constexpr std::uint32_t IdAudio = 0xE1u;
+constexpr std::uint32_t IdSamplingFrequency = 0xB5u;
+constexpr std::uint32_t IdChannels = 0x9Fu;
+constexpr std::uint32_t IdBitDepth = 0x6264u;
 constexpr std::uint32_t IdCluster = 0x1F43B675u;
 constexpr std::uint32_t IdClusterTimestamp = 0xE7u;
 constexpr std::uint32_t IdSimpleBlock = 0xA3u;
@@ -226,6 +231,11 @@ bool MkvWriter::Open( std::ofstream&& outStream,
     headersWritten = false;
     frameCount = 0;
     lastTimestampMs = 0;
+    audioSampleRate = 0;
+    audioChannelCount = 0;
+    audioFrameCount = 0;
+    lastAudioTimestampMs = 0;
+    audioEndMs = 0;
     blockHeader.clear();
     clusterStartMs = 0;
     clusterOpen = false;
@@ -260,6 +270,21 @@ bool MkvWriter::SetCodecPrivate( const std::uint8_t* const data,
     codecPrivate.clear();
     if( size != 0 )
         codecPrivate.assign( data, data + size );
+    return true;
+}
+
+bool MkvWriter::SetAudioTrack( const std::uint32_t sampleRate,
+                               const std::uint32_t channelCount )
+{
+    if( !file.is_open() )
+        return Reject( "SetAudioTrack: writer is not open" );
+    if( headersWritten )
+        return Reject( "SetAudioTrack: headers are already written" );
+    if( sampleRate == 0 || channelCount == 0 )
+        return Reject( "SetAudioTrack: sample rate and channel count must be non-zero" );
+
+    audioSampleRate = sampleRate;
+    audioChannelCount = channelCount;
     return true;
 }
 
@@ -319,10 +344,28 @@ bool MkvWriter::WriteHeaders()
         AppendBinaryElement( trackPayload, IdCodecPrivate, codecPrivate );
     AppendMasterElement( trackPayload, IdVideo, videoPayload );
 
-    ByteBuffer trackEntry;
-    AppendMasterElement( trackEntry, IdTrackEntry, trackPayload );
+    ByteBuffer trackEntries;
+    AppendMasterElement( trackEntries, IdTrackEntry, trackPayload );
+
+    if( audioSampleRate != 0 )
+    {
+        ByteBuffer audioPayload;
+        AppendFloat8Element( audioPayload, IdSamplingFrequency, static_cast< double >( audioSampleRate ) );
+        AppendUintElement( audioPayload, IdChannels, audioChannelCount );
+        AppendUintElement( audioPayload, IdBitDepth, 32u );
+
+        ByteBuffer audioTrackPayload;
+        AppendUintElement( audioTrackPayload, IdTrackNumber, 2u );
+        AppendUintElement( audioTrackPayload, IdTrackUid, 2u );
+        AppendUintElement( audioTrackPayload, IdTrackType, 2u );
+        AppendUintElement( audioTrackPayload, IdFlagLacing, 0u );
+        AppendStringElement( audioTrackPayload, IdCodecId, "A_PCM/FLOAT/IEEE" );
+        AppendMasterElement( audioTrackPayload, IdAudio, audioPayload );
+        AppendMasterElement( trackEntries, IdTrackEntry, audioTrackPayload );
+    }
+
     ByteBuffer tracks;
-    AppendMasterElement( tracks, IdTracks, trackEntry );
+    AppendMasterElement( tracks, IdTracks, trackEntries );
     if( !WriteBytes( tracks.data(), tracks.size(), "WriteHeaders/Tracks" ) )
         return false;
 
@@ -369,7 +412,69 @@ bool MkvWriter::FlushCluster()
     return true;
 }
 
-bool MkvWriter::WriteFrame( const void* const data,
+bool MkvWriter::EnsureCluster( const std::uint64_t timestampMs, const bool cueKeyframe )
+{
+    if( clusterOpen )
+        return true;
+
+    const std::streampos clusterPosition = file.tellp();
+    if( clusterPosition == std::streampos( -1 ) || clusterPosition < segmentPayloadStart )
+        return Fail( "EnsureCluster: invalid cluster position" );
+    if( cueKeyframe )
+    {
+        cuePoints.emplace_back(
+            timestampMs,
+            static_cast< std::uint64_t >( clusterPosition - segmentPayloadStart ) );
+    }
+
+    clusterStartMs = timestampMs;
+    ByteBuffer header;
+    AppendId( header, IdCluster );
+    if( !WriteBytes( header.data(), header.size(), "EnsureCluster/Cluster" ) )
+        return false;
+
+    clusterSizeOffset = file.tellp();
+    constexpr std::uint8_t unknownSize[ 8 ] = {
+        0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF
+    };
+    if( !WriteBytes( unknownSize, sizeof( unknownSize ), "EnsureCluster/ClusterSize" ) )
+        return false;
+
+    header.clear();
+    AppendUintElement( header, IdClusterTimestamp, clusterStartMs );
+    if( !WriteBytes( header.data(), header.size(), "EnsureCluster/ClusterTimestamp" ) )
+        return false;
+    clusterOpen = true;
+    return true;
+}
+
+bool MkvWriter::WriteSimpleBlock( const std::uint8_t trackNumber,
+                                  const std::byte* const data,
+                                  const std::size_t size,
+                                  const std::uint64_t timestampMs,
+                                  const bool keyframe,
+                                  const std::string_view operation )
+{
+    // Signed: a block on one track may trail a cluster opened by the other.
+    const std::int64_t relative = static_cast< std::int64_t >( timestampMs )
+        - static_cast< std::int64_t >( clusterStartMs );
+    if( relative < std::numeric_limits< std::int16_t >::min()
+        || relative > std::numeric_limits< std::int16_t >::max() )
+        return Reject( std::string( operation ) + ": relative cluster timestamp exceeds int16 range" );
+
+    const auto relativeBits = static_cast< std::uint16_t >( relative );
+    blockHeader.clear();
+    AppendId( blockHeader, IdSimpleBlock );
+    AppendSize( blockHeader, size + 4 );
+    blockHeader.push_back( static_cast< std::uint8_t >( 0x80u | trackNumber ) );
+    blockHeader.push_back( static_cast< std::uint8_t >( relativeBits >> 8 ) );
+    blockHeader.push_back( static_cast< std::uint8_t >( relativeBits ) );
+    blockHeader.push_back( keyframe ? 0x80 : 0x00 );
+    return WriteBytes( blockHeader.data(), blockHeader.size(), operation )
+        && WriteBytes( data, size, operation );
+}
+
+bool MkvWriter::WriteFrame( const std::byte* const data,
                             const std::size_t size,
                             const std::uint64_t timestampMs,
                             const bool keyframe )
@@ -386,59 +491,56 @@ bool MkvWriter::WriteFrame( const void* const data,
         return false;
 
     if( clusterOpen
-        && ( keyframe || timestampMs - clusterStartMs >= MaxClusterDurationMs )
+        && ( keyframe || timestampMs >= clusterStartMs + MaxClusterDurationMs )
         && !FlushCluster() )
         return false;
 
-    if( !clusterOpen )
-    {
-        const std::streampos clusterPosition = file.tellp();
-        if( clusterPosition == std::streampos( -1 ) || clusterPosition < segmentPayloadStart )
-            return Fail( "WriteFrame: invalid cluster position" );
-        if( keyframe )
-        {
-            cuePoints.emplace_back(
-                timestampMs,
-                static_cast< std::uint64_t >( clusterPosition - segmentPayloadStart ) );
-        }
+    if( !EnsureCluster( timestampMs, keyframe ) )
+        return false;
 
-        clusterStartMs = timestampMs;
-        ByteBuffer header;
-        AppendId( header, IdCluster );
-        if( !WriteBytes( header.data(), header.size(), "WriteFrame/Cluster" ) )
-            return false;
-
-        clusterSizeOffset = file.tellp();
-        constexpr std::uint8_t unknownSize[ 8 ] = {
-            0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF
-        };
-        if( !WriteBytes( unknownSize, sizeof( unknownSize ), "WriteFrame/ClusterSize" ) )
-            return false;
-
-        header.clear();
-        AppendUintElement( header, IdClusterTimestamp, clusterStartMs );
-        if( !WriteBytes( header.data(), header.size(), "WriteFrame/ClusterTimestamp" ) )
-            return false;
-        clusterOpen = true;
-    }
-
-    const std::uint64_t relative = timestampMs - clusterStartMs;
-    if( relative > static_cast< std::uint64_t >( std::numeric_limits< std::int16_t >::max() ) )
-        return Reject( "WriteFrame: relative cluster timestamp exceeds int16 range" );
-
-    blockHeader.clear();
-    AppendId( blockHeader, IdSimpleBlock );
-    AppendSize( blockHeader, size + 4 );
-    blockHeader.push_back( 0x81 );
-    blockHeader.push_back( static_cast< std::uint8_t >( relative >> 8 ) );
-    blockHeader.push_back( static_cast< std::uint8_t >( relative ) );
-    blockHeader.push_back( keyframe ? 0x80 : 0x00 );
-    if( !WriteBytes( blockHeader.data(), blockHeader.size(), "WriteFrame/BlockHeader" )
-        || !WriteBytes( data, size, "WriteFrame/Packet" ) )
+    if( !WriteSimpleBlock( 1u, data, size, timestampMs, keyframe, "WriteFrame" ) )
         return false;
 
     ++frameCount;
     lastTimestampMs = timestampMs;
+    return true;
+}
+
+bool MkvWriter::WriteAudio( const float* const samples,
+                            const std::size_t sampleFrameCount,
+                            const std::uint64_t timestampMs )
+{
+    if( !file.is_open() )
+        return Reject( "WriteAudio: writer is not open" );
+    if( audioSampleRate == 0 )
+        return Reject( "WriteAudio: SetAudioTrack was not called" );
+    if( samples == nullptr || sampleFrameCount == 0 )
+        return Reject( "WriteAudio: block must not be empty" );
+    const std::size_t bytesPerFrame = audioChannelCount * sizeof( float );
+    if( sampleFrameCount > ( MaxKnownSize8 - 4 ) / bytesPerFrame )
+        return Reject( "WriteAudio: block exceeds the EBML element size limit" );
+    if( audioFrameCount != 0 && timestampMs < lastAudioTimestampMs )
+        return Reject( "WriteAudio: timestamps must be monotonic" );
+    if( !headersWritten && !WriteHeaders() )
+        return false;
+
+    if( clusterOpen
+        && timestampMs >= clusterStartMs + MaxClusterDurationMs
+        && !FlushCluster() )
+        return false;
+
+    if( !EnsureCluster( timestampMs, false ) )
+        return false;
+
+    // PCM blocks decode independently, every one is a keyframe.
+    const auto* const data = reinterpret_cast< const std::byte* >( samples );
+    if( !WriteSimpleBlock( 2u, data, sampleFrameCount * bytesPerFrame, timestampMs, true, "WriteAudio" ) )
+        return false;
+
+    audioFrameCount += sampleFrameCount;
+    lastAudioTimestampMs = timestampMs;
+    audioEndMs = timestampMs
+        + static_cast< std::uint64_t >( std::llround( sampleFrameCount * 1000.0 / audioSampleRate ) );
     return true;
 }
 
@@ -537,7 +639,8 @@ bool MkvWriter::Finalize()
 
     if( success )
     {
-        const double durationMs = frameCount == 0 ? 0.0 : static_cast< double >( lastTimestampMs ) + 1000.0 / fps;
+        const double videoEndMs = frameCount == 0 ? 0.0 : static_cast< double >( lastTimestampMs ) + 1000.0 / fps;
+        const double durationMs = std::max( videoEndMs, static_cast< double >( audioEndMs ) );
         std::uint64_t bits = 0;
         std::memcpy( &bits, &durationMs, sizeof( bits ) );
         std::uint8_t durationBytes[ 8 ]{};

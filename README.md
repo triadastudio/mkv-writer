@@ -1,20 +1,22 @@
 # mkv-writer
 
-Small, dependency-free Matroska writer for a single encoded video track.
-It streams encoded packets directly to a seekable file and back-patches cluster and
-segment sizes during finalization, avoiding whole-GOP buffering.
+Small, dependency-free Matroska writer for a single encoded video track and an
+optional uncompressed audio track. It streams encoded packets directly to a
+seekable file and back-patches cluster and segment sizes during finalization,
+avoiding whole-GOP buffering.
 
 The initial API supports:
 
 - one video track;
+- an optional interleaved 32-bit float PCM audio track (`A_PCM/FLOAT/IEEE`);
 - arbitrary Matroska codec ID and codec-private bytes (used with AV1 and HEVC);
 - `SimpleBlock` output with millisecond timestamps;
 - keyframe cues and a `SeekHead`;
 - bounded five-second clusters;
 - static builds on C++17 toolchains.
 
-Audio, subtitles, lacing, chapters, tags, attachments, and non-seekable outputs are
-intentionally outside this library's scope.
+Compressed audio, subtitles, lacing, chapters, tags, attachments, and non-seekable
+outputs are intentionally outside this library's scope.
 
 ## Usage
 
@@ -27,7 +29,10 @@ mkv_writer::MkvWriter writer;
 writer.Open(std::ofstream("capture.mkv", std::ios::binary),
             1920, 1080, 60.0f, "V_AV1");
 writer.SetCodecPrivate(codec_private.data(), codec_private.size());
-writer.WriteFrame(packet.data(), packet.size(), timestamp_ms, is_keyframe);
+writer.SetAudioTrack(48000, 2);  // optional
+writer.WriteFrame(reinterpret_cast<const std::byte*>(packet.data()),
+                  packet.size(), timestamp_ms, is_keyframe);
+writer.WriteAudio(samples.data(), sample_frame_count, timestamp_ms);
 writer.Finalize();
 ```
 
@@ -73,7 +78,7 @@ conan profile detect --force
 conan create conan -s build_type=Release -s compiler.cppstd=17 --build=missing
 ```
 
-Consume `mkv-writer/0.1.0` through `CMakeDeps` and link the same
+Consume `mkv-writer/0.2.0` through `CMakeDeps` and link the same
 `mkv-writer::mkv-writer` target shown above.
 
 ## License
