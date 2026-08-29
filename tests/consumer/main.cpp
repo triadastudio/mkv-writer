@@ -12,7 +12,7 @@ int main()
     std::filesystem::remove( output );
 
     mkv_writer::MkvWriter writer;
-    if( !writer.Open( std::ofstream( output, std::ios::binary ), 16, 16, 30.0f, "V_AV1" ) )
+    if( !writer.Open( std::ofstream( output, std::ios::binary ), 16, 16, 30, 1, "V_AV1" ) )
         return 1;
 
     constexpr std::array< std::uint8_t, 3 > packet = { 0x01, 0x02, 0x03 };

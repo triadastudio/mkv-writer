@@ -27,7 +27,7 @@ outputs are intentionally outside this library's scope.
 
 mkv_writer::MkvWriter writer;
 writer.Open(std::ofstream("capture.mkv", std::ios::binary),
-            1920, 1080, 60.0f, "V_AV1");
+            1920, 1080, 60, 1, "V_AV1");  // frame rate as a rational, e.g. 24000, 1001
 writer.SetCodecPrivate(codec_private.data(), codec_private.size());
 writer.SetAudioTrack(48000, 2);  // optional
 writer.WriteFrame(reinterpret_cast<const std::byte*>(packet.data()),

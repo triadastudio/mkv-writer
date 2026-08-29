@@ -206,7 +206,8 @@ bool MkvWriter::WriteBytes( const void* const data,
 bool MkvWriter::Open( std::ofstream&& outStream,
                       const std::uint32_t newWidth,
                       const std::uint32_t newHeight,
-                      const float newFps,
+                      const std::uint32_t newFpsNum,
+                      const std::uint32_t newFpsDen,
                       const std::string_view newCodecId )
 {
     if( file.is_open() )
@@ -218,14 +219,15 @@ bool MkvWriter::Open( std::ofstream&& outStream,
         return Reject( "Open: output stream is not open" );
     if( newWidth == 0 || newHeight == 0 )
         return Reject( "Open: dimensions must be non-zero" );
-    if( !std::isfinite( newFps ) || newFps <= 0.0f )
-        return Reject( "Open: fps must be finite and positive" );
+    if( newFpsNum == 0 || newFpsDen == 0 )
+        return Reject( "Open: fps numerator and denominator must be non-zero" );
     if( newCodecId.empty() )
         return Reject( "Open: codec ID must not be empty" );
 
     width = newWidth;
     height = newHeight;
-    fps = newFps;
+    fpsNum = newFpsNum;
+    fpsDen = newFpsDen;
     codecId.assign( newCodecId );
     codecPrivate.clear();
     headersWritten = false;
@@ -339,7 +341,7 @@ bool MkvWriter::WriteHeaders()
     AppendStringElement( trackPayload, IdCodecId, codecId );
     AppendUintElement( trackPayload,
                        IdDefaultDuration,
-                       static_cast< std::uint64_t >( std::llround( 1e9 / fps ) ) );
+                       ( 1000000000ull * fpsDen + fpsNum / 2 ) / fpsNum );
     if( !codecPrivate.empty() )
         AppendBinaryElement( trackPayload, IdCodecPrivate, codecPrivate );
     AppendMasterElement( trackPayload, IdVideo, videoPayload );
@@ -639,7 +641,7 @@ bool MkvWriter::Finalize()
 
     if( success )
     {
-        const double videoEndMs = frameCount == 0 ? 0.0 : static_cast< double >( lastTimestampMs ) + 1000.0 / fps;
+        const double videoEndMs = frameCount == 0 ? 0.0 : static_cast< double >( lastTimestampMs ) + 1000.0 * fpsDen / fpsNum;
         const double durationMs = std::max( videoEndMs, static_cast< double >( audioEndMs ) );
         std::uint64_t bits = 0;
         std::memcpy( &bits, &durationMs, sizeof( bits ) );

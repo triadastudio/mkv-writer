@@ -131,7 +131,7 @@ void TestWritesAndFinalizesMatroska()
 
     mkv_writer::MkvWriter writer;
     RequireSuccess(
-        writer.Open( std::ofstream( path, std::ios::binary ), 1920, 1080, 60.0f, "V_AV1" ),
+        writer.Open( std::ofstream( path, std::ios::binary ), 1920, 1080, 60, 1, "V_AV1" ),
         writer );
     constexpr std::array< std::uint8_t, 4 > codecPrivate = { 0x81, 0x00, 0x0C, 0x00 };
     RequireSuccess( writer.SetCodecPrivate( codecPrivate.data(), codecPrivate.size() ), writer );
@@ -200,7 +200,7 @@ void TestWritesInterleavedAudioTrack()
 
     mkv_writer::MkvWriter writer;
     RequireSuccess(
-        writer.Open( std::ofstream( path, std::ios::binary ), 320, 180, 60.0f, "V_AV1" ),
+        writer.Open( std::ofstream( path, std::ios::binary ), 320, 180, 60, 1, "V_AV1" ),
         writer );
     RequireSuccess( writer.SetAudioTrack( 1000, 2 ), writer );
 
@@ -310,6 +310,72 @@ void TestWritesInterleavedAudioTrack()
     std::filesystem::remove( path );
 }
 
+void TestWritesExactNtscDefaultDuration()
+{
+    const auto path = TestPath( "mkv-writer-rational-fps-test" );
+    std::filesystem::remove( path );
+
+    mkv_writer::MkvWriter writer;
+    Require( !writer.Open( std::ofstream( path, std::ios::binary ), 64, 64, 0, 1, "V_AV1" ),
+             "zero fps numerator was accepted" );
+    Require( !writer.Open( std::ofstream( path, std::ios::binary ), 64, 64, 30, 0, "V_AV1" ),
+             "zero fps denominator was accepted" );
+
+    RequireSuccess(
+        writer.Open( std::ofstream( path, std::ios::binary ), 64, 64, 24000, 1001, "V_AV1" ),
+        writer );
+    constexpr std::array< std::uint8_t, 1 > packet = { 0x01 };
+    RequireSuccess( writer.WriteFrame( AsBytes( packet.data() ), packet.size(), 0, true ), writer );
+    RequireSuccess( writer.Finalize(), writer );
+
+    const Bytes bytes = ReadAll( path );
+    constexpr std::array segment = { std::uint8_t{ 0x18 }, std::uint8_t{ 0x53 }, std::uint8_t{ 0x80 }, std::uint8_t{ 0x67 } };
+    constexpr std::uint32_t IdTracks = 0x1654AE6Bu;
+    constexpr std::uint32_t IdTrackEntry = 0xAEu;
+    constexpr std::uint32_t IdDefaultDuration = 0x23E383u;
+
+    const auto segmentOffset = Find( bytes, segment );
+    Require( segmentOffset != NotFound, "missing Segment" );
+    const Element segmentElement = ReadElement( bytes, segmentOffset, bytes.size() );
+
+    std::uint64_t defaultDuration = 0;
+    std::size_t childOffset = segmentElement.payloadOffset;
+    while( childOffset < segmentElement.End() )
+    {
+        const Element child = ReadElement( bytes, childOffset, segmentElement.End() );
+        if( child.id == IdTracks )
+        {
+            std::size_t entryOffset = child.payloadOffset;
+            while( entryOffset < child.End() )
+            {
+                const Element entry = ReadElement( bytes, entryOffset, child.End() );
+                if( entry.id == IdTrackEntry )
+                {
+                    std::size_t fieldOffset = entry.payloadOffset;
+                    while( fieldOffset < entry.End() )
+                    {
+                        const Element field = ReadElement( bytes, fieldOffset, entry.End() );
+                        if( field.id == IdDefaultDuration )
+                        {
+                            for( std::size_t i = 0; i < field.payloadSize; ++i )
+                                defaultDuration = ( defaultDuration << 8u ) | bytes[ field.payloadOffset + i ];
+                        }
+                        fieldOffset = field.End();
+                    }
+                }
+                entryOffset = entry.End();
+            }
+        }
+        childOffset = child.End();
+    }
+
+    // Rounded 1e9 * 1001 / 24000: exact from the rational, off by tens of
+    // nanoseconds from a float 23.976 fps.
+    Require( defaultDuration == 41708333, "NTSC default duration is not exact" );
+
+    std::filesystem::remove( path );
+}
+
 void TestRejectsAudioMisuse()
 {
     const auto path = TestPath( "mkv-writer-audio-misuse-test" );
@@ -321,7 +387,7 @@ void TestRejectsAudioMisuse()
 
     mkv_writer::MkvWriter writer;
     RequireSuccess(
-        writer.Open( std::ofstream( path, std::ios::binary ), 64, 64, 30.0f, "V_AV1" ),
+        writer.Open( std::ofstream( path, std::ios::binary ), 64, 64, 30, 1, "V_AV1" ),
         writer );
     Require( !writer.SetAudioTrack( 0, 2 ), "zero sample rate was accepted" );
     Require( !writer.SetAudioTrack( 48000, 0 ), "zero channel count was accepted" );
@@ -337,7 +403,7 @@ void TestRejectsAudioMisuse()
     RequireSuccess( writer.Finalize(), writer );
 
     RequireSuccess(
-        writer.Open( std::ofstream( secondPath, std::ios::binary ), 64, 64, 30.0f, "V_AV1" ),
+        writer.Open( std::ofstream( secondPath, std::ios::binary ), 64, 64, 30, 1, "V_AV1" ),
         writer );
     Require( !writer.WriteAudio( block.data(), block.size() / 2, 0 ),
              "Open did not reset the audio track" );
@@ -359,7 +425,7 @@ void TestRejectsInvalidCallOrderAndTimestamps()
 
     mkv_writer::MkvWriter writer;
     RequireSuccess(
-        writer.Open( std::ofstream( path, std::ios::binary ), 64, 64, 30.0f, "V_AV1" ),
+        writer.Open( std::ofstream( path, std::ios::binary ), 64, 64, 30, 1, "V_AV1" ),
         writer );
     RequireSuccess( writer.WriteFrame( AsBytes( packet.data() ), packet.size(), 10, true ), writer );
     Require( !writer.SetCodecPrivate( packet.data(), packet.size() ),
@@ -382,7 +448,7 @@ void TestClearsCodecPrivate()
 
     mkv_writer::MkvWriter writer;
     RequireSuccess(
-        writer.Open( std::ofstream( path, std::ios::binary ), 64, 64, 30.0f, "V_AV1" ),
+        writer.Open( std::ofstream( path, std::ios::binary ), 64, 64, 30, 1, "V_AV1" ),
         writer );
     constexpr std::array< std::uint8_t, 8 > codecPrivate = {
         0xDE, 0xAD, 0xFA, 0xCE, 0xC0, 0xFF, 0xEE, 0x42
@@ -408,13 +474,13 @@ void TestReusesWriterAfterFinalize()
     mkv_writer::MkvWriter writer;
     constexpr std::array< std::uint8_t, 1 > packet = { 0x01 };
     RequireSuccess(
-        writer.Open( std::ofstream( firstPath, std::ios::binary ), 64, 64, 30.0f, "V_AV1" ),
+        writer.Open( std::ofstream( firstPath, std::ios::binary ), 64, 64, 30, 1, "V_AV1" ),
         writer );
     RequireSuccess( writer.WriteFrame( AsBytes( packet.data() ), packet.size(), 0, true ), writer );
     RequireSuccess( writer.Finalize(), writer );
 
     RequireSuccess(
-        writer.Open( std::ofstream( secondPath, std::ios::binary ), 32, 32, 24.0f, "V_AV1" ),
+        writer.Open( std::ofstream( secondPath, std::ios::binary ), 32, 32, 24, 1, "V_AV1" ),
         writer );
     Require( writer.GetWrittenFrameCount() == 0, "Open did not reset the frame count" );
     Require( writer.LastError().empty(), "Open did not reset the prior error state" );
@@ -433,7 +499,7 @@ void TestDestructorFinalizesEmptyFile()
     {
         mkv_writer::MkvWriter writer;
         RequireSuccess(
-            writer.Open( std::ofstream( path, std::ios::binary ), 320, 180, 24.0f, "V_AV1" ),
+            writer.Open( std::ofstream( path, std::ios::binary ), 320, 180, 24, 1, "V_AV1" ),
             writer );
     }
 
@@ -453,6 +519,7 @@ int main()
     {
         TestWritesAndFinalizesMatroska();
         TestWritesInterleavedAudioTrack();
+        TestWritesExactNtscDefaultDuration();
         TestRejectsAudioMisuse();
         TestRejectsInvalidCallOrderAndTimestamps();
         TestClearsCodecPrivate();

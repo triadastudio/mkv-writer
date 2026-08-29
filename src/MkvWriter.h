@@ -25,11 +25,14 @@ public:
     MkvWriter& operator=( MkvWriter&& ) = delete;
 
     // Takes ownership of an open binary, seekable output stream. Append mode
-    // is unsupported because finalization back-patches earlier metadata.
+    // is unsupported because finalization back-patches earlier metadata. The
+    // frame rate is the rational fpsNum / fpsDen; integer-rate callers pass
+    // the rate and 1.
     bool Open( std::ofstream&& outStream,
                const std::uint32_t width,
                const std::uint32_t height,
-               const float fps,
+               const std::uint32_t fpsNum,
+               const std::uint32_t fpsDen,
                const std::string_view codecId );
 
     // Must be called after Open and before the first WriteFrame.
@@ -88,7 +91,8 @@ private:
 
     std::uint32_t width = 0;
     std::uint32_t height = 0;
-    float fps = 60.0f;
+    std::uint32_t fpsNum = 60;
+    std::uint32_t fpsDen = 1;
     std::string codecId;
     std::vector< std::uint8_t > codecPrivate;
 
